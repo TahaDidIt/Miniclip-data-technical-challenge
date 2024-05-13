@@ -16,6 +16,7 @@ from statsmodels.formula.api import ols
 from scipy.stats import norm
 
 
+
 #Loading datasets into a Pandas dataframe
 csvPathActivity = "C:/Taha/projects/Data Science Fundamentals with Python and SQL/Miniclip analysis task working directory/data_activity.csv"
 csvPathIAP = "C:/Taha/projects/Data Science Fundamentals with Python and SQL/Miniclip analysis task working directory/data_in_app_purchases.csv"
@@ -28,12 +29,49 @@ matchesData = pd.read_csv(csvPathMatches)
 VPData = pd.read_csv(csvPathVP)
 
 
-#Deriving more convenient datasets
-#activity data without duplicate user_ids, now activity date is latest activity
+
+### Deriving more convenient datasets
+
+#activity data without duplicate user_ids
+#Note: now activity date is the latest activity
 userData = activityData.drop_duplicates(subset = "user_id", keep = "last")
 
+"""NOTE: Users in activity and transactions tables are not all the same-
+    many users will not be filled in for below"""
+#Merging userData and IAP and VP data
+#grouping IAP by user
+totalIAPSpend = IAPData.groupby("user_id")["dollar_purchase_value"].sum().reset_index()
+#merge with userData
+userIAPs = pd.merge(userData, totalIAPSpend, on = "user_id", how = "left")
+#grouping VP by user
+totalVPSpend = VPData.groupby("user_id")["gold_spend"].sum().reset_index()
+#Now merge with userIAPs to get full user spend record
+userSpend = pd.merge(userIAPs, totalVPSpend, on = "user_id", how = "left")
+#fill null values where a user has never spent
+userSpend["dollar_purchase_value"] = userSpend["dollar_purchase_value"].fillna(0)
+userSpend["gold_spend"] = userSpend["gold_spend"].fillna(0)
 
+#Calculating winrate and matches played data
+#total matches played by each user
+matchesPlayed = matchesData.groupby("user_id")["n_matches"].sum().reset_index()
+#total wins of each user
+winsRecord = matchesData.loc[matchesData["finish_position"] == 1, ["user_id", "n_matches"]].reset_index()
+totalWins = winsRecord.groupby("user_id")["n_matches"].sum().reset_index()
+
+userRecord = pd.merge(totalWins, VPData, on = "user_id", how = "inner")
+
+
+
+"""
+userRecord = pd.DataFrame({
+    "user_id"
+    })
+"""
+
+
+"""
 userData.to_csv("userData.csv")
+"""
 
 
 
@@ -48,7 +86,7 @@ def platformActivity():
     userData = activityData.drop_duplicates(subset = "user_id", keep = "last")
     ax = sns.countplot(x = "platform", data = userData)
     ax.set_title("Players by Platform")
-    plt.show
+    plt.show()
 
 
 """
